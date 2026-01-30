@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        video {
+            width: 100%;
+            max-width: 500px;
+            border: 2px solid #333;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 5px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button.stop {
+            background-color: #f44336;
+        }
+        canvas {
+            display: none;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f1f1f1;
+        }
+    </style>
+</head>
+<body>
+    <h1>Camera Functionality Test</h1>
+    <p>This is a simple test page to verify that the camera API works properly in your browser.</p>
+    
+    <div>
+        <button id="startCamera">Start Camera</button>
+        <button id="stopCamera" class="stop" disabled>Stop Camera</button>
+        <button id="captureFrame">Capture Frame</button>
+    </div>
+    
+    <video id="video" autoplay playsInline muted></video>
+    <canvas id="canvas"></canvas>
+    
+    <div id="status">Status: Ready</div>
+
+    <script>
+        const videoElement = document.getElementById('video');
+        const canvasElement = document.getElementById('canvas');
+        const startButton = document.getElementById('startCamera');
+        const stopButton = document.getElementById('stopCamera');
+        const captureButton = document.getElementById('captureFrame');
+        const statusElement = document.getElementById('status');
+        
+        let stream = null;
+        
+        startButton.addEventListener('click', async () => {
+            try {
+                statusElement.textContent = 'Status: Requesting camera access...';
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoElement.srcObject = stream;
+                
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                captureButton.disabled = false;
+                
+                statusElement.textContent = 'Status: Camera active';
+            } catch (err) {
+                statusElement.textContent = `Status: Error accessing camera: ${err.message}`;
+                console.error('Error:', err);
+            }
+        });
+        
+        stopButton.addEventListener('click', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                stream = null;
+                
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                captureButton.disabled = true;
+                
+                statusElement.textContent = 'Status: Camera stopped';
+            }
+        });
+        
+        captureButton.addEventListener('click', () => {
+            if (!stream) {
+                statusElement.textContent = 'Status: No camera active';
+                return;
+            }
+            
+            const context = canvasElement.getContext('2d');
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            
+            context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+            
+            try {
+                const imageDataUrl = canvasElement.toDataURL('image/jpeg', 0.8);
+                statusElement.textContent = `Status: Frame captured! Base64 length: ${imageDataUrl.length} characters`;
+                console.log('Image data URL:', imageDataUrl.substring(0, 50) + '...');
+            } catch (err) {
+                statusElement.textContent = `Status: Error capturing frame: ${err.message}`;
+                console.error('Error:', err);
+            }
+        });
+        
+        // Disable capture button initially
+        captureButton.disabled = true;
+    </script>
+</body>
+</html> 
