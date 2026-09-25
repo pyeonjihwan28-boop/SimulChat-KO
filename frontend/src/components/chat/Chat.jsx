@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ChatMessage from './ChatMessage';
 import { useEmotes } from '../emotes/EmoteManager';
+import { makeViewer, stylize, chatRate, nextGap, makeHype, driftViewers, rand, randInt } from '../../live/liveLogic';
 import { PaperAirplaneIcon, MicrophoneIcon, Cog8ToothIcon, ShieldCheckIcon, UserGroupIcon, ChatBubbleBottomCenterTextIcon, StopCircleIcon, CameraIcon, ArrowUpTrayIcon, VideoCameraIcon, VideoCameraSlashIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline';
 
 // Updated AI agent definitions
@@ -789,6 +790,77 @@ const Chat = () => {
 
   const [isReplyingToUser, setIsReplyingToUser] = useState(false);
 
+  // ----- FC 26 라이브 로직: 킥오프, 시청자 수에 따른 속도, 폭주, 한국식 닉네임 -----
+  const [live, setLive] = useState(false);                 // 킥오프를 눌러야 채팅 시작
+  const liveRef = useRef(false);
+  const baseViewersRef = useRef(Number(localStorage.getItem('simulchat_base_viewers')) || 30000);
+  const viewersRef = useRef(0);
+  const hypeRef = useRef(makeHype());
+  const crowdRef = useRef({});                              // AI 시청자 이름 → 한국식 시청자 (닉네임·말버릇 고정)
+  const inflightRef = useRef(0);                            // 지금 AI에게 요청 중인 수
+  const MAX_INFLIGHT = 2;                                   // 더 밀리면 그 차례는 건너뜀 (Ollama 몰림 방지)
+
+  const viewerFor = (key) => {
+    if (!crowdRef.current[key]) crowdRef.current[key] = makeViewer();
+    return crowdRef.current[key];
+  };
+
+  // AI 시청자 여러 명에게 장면을 알려 각자 성격대로 반응하게 함 (시간차를 두고)
+  const agentsReact = (situation, n, lo, hi) => {
+    [...aiAgents].sort(() => 0.5 - Math.random()).slice(0, n).forEach((agent) => {
+      setTimeout(() => {
+        if (!liveRef.current) return;
+        getRealAgentResponse(agent, situation).then((t) => {
+          if (t && t.trim() && liveRef.current) addMessageToChat(agent.name, t, agent.color, agent.badges || []);
+        }).catch(() => {});
+      }, rand(lo, hi) * 1000);
+    });
+  };
+
+  const handleKickoff = () => {
+    if (liveRef.current) return;
+    setMessages([]);
+    liveRef.current = true;
+    setLive(true);
+    viewersRef.current = Math.round(baseViewersRef.current * (1 + Math.random() * 0.12));
+    setViewerCount(viewersRef.current);
+    hypeRef.current.reset();
+    hypeRef.current.add(1.5);
+    agentsReact('경기 시작! 킥오프', randInt(5, 7), 0.2, 4);
+  };
+
+  const handleStopChat = () => {
+    liveRef.current = false;
+    setLive(false);
+  };
+
+  const handleGoal = () => {
+    if (!liveRef.current) return;
+    hypeRef.current.add(3);
+    viewersRef.current = Math.round(viewersRef.current * (1.04 + Math.random() * 0.08));
+    setViewerCount(viewersRef.current);
+    agentsReact('방금 골 들어감!!', randInt(8, 12), 0, 4);
+  };
+
+  const handleSettings = () => {
+    const v = window.prompt('기본 시청자 수 (채팅 속도가 여기에 맞춰져요)', String(baseViewersRef.current));
+    const n = Number(String(v || '').replace(/[^0-9]/g, ''));
+    if (n >= 100) {
+      baseViewersRef.current = n;
+      localStorage.setItem('simulchat_base_viewers', String(n));
+    }
+  };
+
+  // 시청자 수: 4초마다 기본 시청자 수 쪽으로 천천히
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!liveRef.current) return;
+      viewersRef.current = driftViewers(viewersRef.current, baseViewersRef.current);
+      setViewerCount(viewersRef.current);
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
+
   // Refs for AI loop management
   const ambientTimeoutIdRef = useRef(null);
   const recentSpeakersRef = useRef({ agents: [] });
@@ -935,6 +1007,17 @@ const Chat = () => {
   }
 
   const addMessageToChat = (user, text, userColor, badges = [], isFirstTimeChat = false, isReply = false, replyTo = null) => {
+    // AI 시청자·군중은 한국식 닉네임과 고정된 말버릇으로 보여 줌 (내 채팅은 '나')
+    let shownName = user;
+    if (user === 'CurrentUser' || user.startsWith('CurrentUser')) {
+      shownName = '나';
+    } else {
+      const v = viewerFor(user);
+      shownName = v.name;
+      text = stylize(text, v);
+      isFirstTimeChat = isFirstTimeChat || v.member;   // 멤버는 초록 이름
+    }
+    if (replyTo === 'CurrentUser') replyTo = '나';
     // Track topics in the message to prevent repetition
     if (user !== 'CurrentUser') {
       // Extract potential topics from the message
@@ -975,7 +1058,7 @@ const Chat = () => {
     
     const newMessage = {
       id: generateUniqueId(),
-      user,
+      user: shownName,
       text,
       userColor,
       badges,
@@ -1010,6 +1093,8 @@ const Chat = () => {
   // Renamed from handleUserMessageAndTriggerAI to reflect its new role
   const processStreamerInputAndTriggerAIs = async (streamerInputText, isVoiceInput = false) => {
     if (!isVoiceInput && streamerInputText.trim() === '') return;
+    if (!liveRef.current) return;                 // 킥오프 전에는 시청자 반응 없음
+    hypeRef.current.add(1);
     
     setIsReplyingToUser(true); // Set the flag that we are replying to the user
 
@@ -1042,7 +1127,8 @@ const Chat = () => {
     }
 
     // --- NEW: All agents respond logic ---
-    const responsePromises = aiAgents.map(agent => {
+    const responders = [...aiAgents].sort(() => 0.5 - Math.random()).slice(0, randInt(6, 10));
+    const responsePromises = responders.map(agent => {
       // Stagger responses over a period of time to feel more natural
       const individualDelay = Math.random() * 2500 + 100; // 100ms to 2.6s
 
@@ -1067,78 +1153,42 @@ const Chat = () => {
     });
   };
 
-  // Ambient AI Chatter - Simulating AIs talking on their own
+  // 평소 채팅: 시청자 수와 폭주 정도로 정한 속도로 한 줄씩.
+  // AI(Ollama)는 동시에 MAX_INFLIGHT개까지만 부르고, 밀리면 그 차례는 건너뜀.
   useEffect(() => {
-    const ambientLoop = async () => {
-      // PAUSE ambient chat if agents are replying to the user
-      if (isReplyingToUser) {
-        ambientTimeoutIdRef.current = setTimeout(ambientLoop, 2000); // Check back in 2 seconds
+    let stopped = false;
+    const ambientLoop = () => {
+      if (stopped) return;
+      if (!liveRef.current) {
+        ambientTimeoutIdRef.current = setTimeout(ambientLoop, 1000);
         return;
       }
-
-      if (aiAgents.length > 0) {
-        // If music is playing, generate dance messages instead of regular ambient messages
-        if (isMusicPlayingRef.current) {
-          // MODIFIED: Increased chance from 30% to 60% to make chat more spammy during dance mode
-          if (Math.random() < 0.6) {
-            // MODIFIED: Generate 2-4 dance messages at once instead of just one
-            const messageCount = Math.floor(Math.random() * 3) + 2; // 2-4 messages
-            const shuffledAgents = [...aiAgents].sort(() => 0.5 - Math.random());
-            
-            for (let i = 0; i < messageCount && i < shuffledAgents.length; i++) {
-              const agent = shuffledAgents[i];
-              const danceMessage = generateDanceMessage();
-              addMessageToChat(agent.name, danceMessage, agent.color, agent.badges || []);
-            }
-          }
-          
-          // MODIFIED: Continue the loop with a shorter delay during dance mode
-          const nextDelay = Math.random() * 600 + 200; // 200-800ms (much faster)
-          ambientTimeoutIdRef.current = setTimeout(ambientLoop, nextDelay);
-          return;
-        }
-        
-        // Regular ambient behavior when no music is playing
-        // Decide whether to make a visual comment or a generic ambient one
-        const shouldMakeVisualComment = (isCameraActive || isScreenSharingActive) && Math.random() < 0.9; // 90% chance if visuals are on
-
+      if (isMusicPlayingRef.current) {
+        const agent = aiAgents[Math.floor(Math.random() * aiAgents.length)];
+        addMessageToChat(agent.name, generateDanceMessage(), agent.color, agent.badges || []);
+      } else if (!isReplyingToUser && inflightRef.current < MAX_INFLIGHT) {
         const availableAgents = aiAgents.filter(a => !recentSpeakersRef.current.agents.includes(a.name));
         const agentPool = availableAgents.length > 0 ? availableAgents : aiAgents;
         const agent = agentPool[Math.floor(Math.random() * agentPool.length)];
         recentSpeakersRef.current.agents = [agent.name, ...recentSpeakersRef.current.agents.slice(0, 4)];
-
-        try {
-          let aiText = null;
-          if (shouldMakeVisualComment) {
-            console.log(`Ambient loop: Triggering VISUAL comment for ${agent.name}`);
-            aiText = await triggerVisualComment(agent);
-          } else {
-            console.log(`Ambient loop: Triggering GENERIC comment for ${agent.name}`);
-            aiText = await getRealAgentResponse(agent, ""); 
-          }
-
-          if (aiText && aiText.trim() !== '') {
-            addMessageToChat(agent.name, aiText, agent.color, agent.badges || []);
-          }
-        } catch (error) {
-          console.error(`Error getting ambient response for ${agent.name}:`, error);
-        }
+        const visual = (isCameraActive || isScreenSharingActive) && Math.random() < 0.7;
+        inflightRef.current += 1;
+        (visual ? triggerVisualComment(agent) : getRealAgentResponse(agent, ''))
+          .then((aiText) => {
+            if (aiText && aiText.trim() !== '' && liveRef.current) {
+              addMessageToChat(agent.name, aiText, agent.color, agent.badges || []);
+            }
+          })
+          .catch((error) => console.error(`Error getting ambient response for ${agent.name}:`, error))
+          .finally(() => { inflightRef.current -= 1; });
       }
-      
-      // MODIFIED: Make regular chat faster when camera/screen is active
-      let nextDelay;
-      if (isCameraActive || isScreenSharingActive) {
-        nextDelay = Math.random() * 1000 + 500; // 0.5 - 1.5 seconds (fast)
-      } else {
-        nextDelay = Math.random() * 2000 + 1000; // 1-3 seconds (original speed)
-      }
-      ambientTimeoutIdRef.current = setTimeout(ambientLoop, nextDelay);
+      ambientTimeoutIdRef.current = setTimeout(ambientLoop, nextGap(chatRate(viewersRef.current, hypeRef.current.cur())));
     };
 
-    ambientTimeoutIdRef.current = setTimeout(ambientLoop, Math.random() * 4000 + 3000); // Initial delay
+    ambientTimeoutIdRef.current = setTimeout(ambientLoop, 1000);
 
-    return () => clearTimeout(ambientTimeoutIdRef.current);
-  }, [isReplyingToUser, aiAgents]);
+    return () => { stopped = true; clearTimeout(ambientTimeoutIdRef.current); };
+  }, [isReplyingToUser, aiAgents, isCameraActive, isScreenSharingActive]);
   
   // Function to generate a cohesive and natural dance-themed message
   function generateDanceMessage() {
@@ -1771,7 +1821,7 @@ const Chat = () => {
     
     lastContextUpdateRef.current[contextType] = currentTime;
     
-    setVisualContextStatus('Updating visual context...');
+    setVisualContextStatus('화면 읽는 중...');
     setBackendError(null);
 
     // PERFORMANCE OPTIMIZATION: Fire-and-forget approach - don't wait for response
@@ -1789,7 +1839,7 @@ const Chat = () => {
     .then(data => {
       if (data.error) {
         console.error('Visual context update error:', data.error);
-        setVisualContextStatus(`Error: ${data.error}`);
+        setVisualContextStatus(`오류: ${data.error}`);
       } else {
         console.log('Visual context updated successfully:', data.message);
         setVisualContextStatus(data.message);
@@ -1797,7 +1847,7 @@ const Chat = () => {
     })
     .catch(error => {
       console.error('Failed to send visual context:', error);
-      setVisualContextStatus('Visual context update failed');
+      setVisualContextStatus('화면 읽기 실패');
     });
     
     // IMMEDIATE RETURN: Don't block on backend response
@@ -1920,7 +1970,7 @@ const Chat = () => {
 
   const startCamera = async () => {
     setCameraError('');
-    setVisualContextStatus('Starting camera...');
+    setVisualContextStatus('카메라 켜는 중...');
     
     if (!videoRef.current) {
       console.log("Video ref is still null after effect, creating video element");
@@ -1971,7 +2021,7 @@ const Chat = () => {
         
         setIsCameraActive(true);
         // MODIFIED: Use a static success message
-        setVisualContextStatus(isScreenSharingActive ? 'Camera & Screen Active' : 'Camera Active');
+        setVisualContextStatus(isScreenSharingActive ? '카메라·화면 보는 중' : '카메라 켜짐');
         
         if (captureIntervalRef.current) {
           clearInterval(captureIntervalRef.current);
@@ -1994,17 +2044,17 @@ const Chat = () => {
       } catch (err) {
         console.error("Error accessing camera:", err);
         setCameraError(`Error accessing camera: ${err.name} - ${err.message}. Please ensure camera permission is granted.`);
-        setVisualContextStatus('Camera Access Denied');
+        setVisualContextStatus('카메라 권한 없음');
         setIsCameraActive(false);
       }
     } else {
       setCameraError('getUserMedia not supported by this browser.');
-      setVisualContextStatus('Camera Not Supported');
+      setVisualContextStatus('카메라 지원 안 됨');
     }
   };
 
   const stopCamera = () => {
-    setVisualContextStatus('Stopping camera...');
+    setVisualContextStatus('카메라 끄는 중...');
     if (captureIntervalRef.current) {
       clearInterval(captureIntervalRef.current);
       captureIntervalRef.current = null;
@@ -2018,7 +2068,7 @@ const Chat = () => {
     }
     setIsCameraActive(false);
     setCameraError('');
-    setVisualContextStatus(isScreenSharingActive ? 'Screen Share Active' : 'Inputs Idle');
+    setVisualContextStatus(isScreenSharingActive ? '화면 공유 중' : '');
   };
 
   const handleToggleCamera = () => {
@@ -2082,7 +2132,7 @@ const Chat = () => {
 
   const startScreenShare = async () => {
     setScreenShareError('');
-    setVisualContextStatus('Starting screen share...');
+    setVisualContextStatus('화면 공유 켜는 중...');
 
     if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
       try {
@@ -2109,7 +2159,7 @@ const Chat = () => {
 
         setIsScreenSharingActive(true);
         // MODIFIED: Use a static success message
-        setVisualContextStatus(isCameraActive ? 'Camera & Screen Active' : 'Screen Share Active');
+        setVisualContextStatus(isCameraActive ? '카메라·화면 보는 중' : '화면 공유 중');
 
         // Start music detection if audio track is present
         startMusicDetection(stream);
@@ -2135,7 +2185,7 @@ const Chat = () => {
       } catch (err) {
         console.error("Error starting screen share:", err);
         setScreenShareError(`Screen share error: ${err.name} - ${err.message}.`);
-        setVisualContextStatus('Screen Share Failed');
+        setVisualContextStatus('화면 공유 실패');
         setIsScreenSharingActive(false);
         if (screenStreamRef.current) {
             screenStreamRef.current.getTracks().forEach(track => track.stop());
@@ -2144,12 +2194,12 @@ const Chat = () => {
       }
     } else {
       setScreenShareError('Screen sharing (getDisplayMedia) not supported by this browser.');
-      setVisualContextStatus('Screen Share Not Supported');
+      setVisualContextStatus('화면 공유 지원 안 됨');
     }
   };
 
   const stopScreenShare = () => {
-    setVisualContextStatus('Stopping screen share...');
+    setVisualContextStatus('화면 공유 끄는 중...');
     if (screenCaptureIntervalRef.current) {
       clearInterval(screenCaptureIntervalRef.current);
       screenCaptureIntervalRef.current = null;
@@ -2165,7 +2215,7 @@ const Chat = () => {
     }
     setIsScreenSharingActive(false);
     setScreenShareError('');
-    setVisualContextStatus(isCameraActive ? 'Camera Active' : 'Inputs Idle');
+    setVisualContextStatus(isCameraActive ? '카메라 켜짐' : '');
   };
 
   const handleToggleScreenShare = () => {
@@ -2178,9 +2228,6 @@ const Chat = () => {
 
   // Function to handle viewers button click
   const handleViewersClick = () => {
-    // Generate a random viewer count between 50 and 500
-    const randomViewers = Math.floor(Math.random() * 451) + 50;
-    setViewerCount(randomViewers);
     setShowViewersModal(true);
     
     // Auto-hide the modal after 3 seconds
@@ -2234,6 +2281,10 @@ const Chat = () => {
       }
 
       if (!isCameraActive && !isScreenSharingActive) return;
+      if (!liveRef.current) {
+        visualCommentTimeoutIdRef.current = setTimeout(visualCommentLoop, 2000);
+        return;
+      }
       
       // If music is playing, increase the frequency of dance messages
       if (isMusicPlayingRef.current) {
@@ -2503,11 +2554,18 @@ const Chat = () => {
 
       {/* Chat Messages */}
       <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto py-2 bg-[#0f0f0f] custom-scrollbar">
-        {messages.length === 0 ? (
+        {!live ? (
+          <div className="flex flex-col items-center justify-center h-full text-[#aaaaaa]">
+            <button type="button" onClick={handleKickoff}
+              className="px-10 py-4 rounded-full bg-[#e62117] hover:bg-[#ff3b30] text-white text-xl font-bold shadow-lg transition-colors">
+              ⚽&nbsp;&nbsp;킥오프
+            </button>
+            <p className="text-xs mt-4 text-center leading-5">경기가 시작되면 눌러 주세요<br />누르면 채팅이 시작돼요</p>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-[#aaaaaa]">
             <ChatBubbleBottomCenterTextIcon className="h-10 w-10 mb-2" />
             <p className="text-sm">실시간 채팅에 오신 것을 환영합니다!</p>
-            <p className="text-xs mt-1">채팅을 치거나 카메라·화면 공유를 켜면 시청자들이 반응해요.</p>
           </div>
         ) : (
           messages.map((msg) => (
@@ -2611,7 +2669,13 @@ const Chat = () => {
                   <UserGroupIcon className="h-5 w-5"/>
                 </button>
                 
-                <button type="button" className="text-[#aaaaaa] hover:text-white transition-colors" title="설정">
+                {live && (
+                  <>
+                    <button type="button" onClick={handleGoal} className="text-[#aaaaaa] hover:text-white transition-colors text-sm leading-5" title="골! (채팅 폭주)">⚽ 골</button>
+                    <button type="button" onClick={handleStopChat} className="text-[#aaaaaa] hover:text-white transition-colors text-sm leading-5" title="채팅 멈추기 (킥오프 전으로)">⏹ 멈추기</button>
+                  </>
+                )}
+                <button type="button" onClick={handleSettings} className="text-[#aaaaaa] hover:text-white transition-colors" title="기본 시청자 수 설정">
                   <Cog8ToothIcon className="h-5 w-5"/>
                 </button>
             </div>
