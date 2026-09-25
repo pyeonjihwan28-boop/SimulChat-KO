@@ -9,13 +9,8 @@ import time
 from collections import deque
 import base64
 import os
-import tempfile
-import subprocess
-from pydub import AudioSegment
-import speech_recognition as sr
 import random
 import re  # Using SpeechRecognition instead
-import shutil # For checking ffmpeg
 import json
 import queue
 from queue import Queue
@@ -29,10 +24,6 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = app.logger
 
-# --- Speech Recognition Setup ---
-# Initialize recognizer here, after imports
-recognizer = sr.Recognizer()
-logger.info("SpeechRecognition initialized")
 
 # --- Visual Context Storage ---
 # Store camera and screen images separately
@@ -63,18 +54,6 @@ analysis_worker_active = False
 # Context refresh interval in seconds - reduced to improve responsiveness
 CONTEXT_REFRESH_INTERVAL = 5  # Keep context for 5 seconds before considering it "new"
 
-# Check for ffmpeg (still needed for audio conversion)
-def check_ffmpeg():
-    """Checks if ffmpeg is installed and in PATH."""
-    ffmpeg_available = shutil.which("ffmpeg") is not None
-    if ffmpeg_available:
-        logger.info("ffmpeg found in PATH.")
-    else:
-        logger.warning("ffmpeg not found in PATH. Audio conversion may fail.")
-    return ffmpeg_available
-
-# Check ffmpeg on startup
-ffmpeg_available = check_ffmpeg()
 
 # Configuration for Ollama
 OLLAMA_BASE_URL = "http://localhost:11434"
@@ -800,104 +779,6 @@ def get_ai_response():
         return jsonify({"error": f"Could not connect to Ollama: {str(e)}"}), 503
     except Exception as e:
         logger.error(f"An unexpected error occurred in get_ai_response: {e}", exc_info=True)
-        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
-
-@app.route('/api/transcribe-audio', methods=['POST'])
-def transcribe_audio():
-    logger.info(f"Received transcribe-audio request. Content-Type: {request.content_type}")
-    logger.info(f"Request headers: {dict(request.headers)}")
-    
-    if not ffmpeg_available:
-        logger.error("ffmpeg not found. Cannot process audio.")
-        return jsonify({"error": "ffmpeg is not installed or not in PATH. Audio processing unavailable."}), 500
-
-    # Log all form data and files
-    logger.info(f"Form data: {dict(request.form)}")
-    logger.info(f"Files: {list(request.files.keys())}")
-    
-    if 'audio_file' not in request.files:
-        logger.error("No 'audio_file' in request.files. Keys found: " + str(list(request.files.keys())))
-        return jsonify({"error": "No audio file part"}), 400
-    
-    file = request.files['audio_file']
-    if file.filename == '':
-        logger.error("File has no filename")
-        return jsonify({"error": "No selected file"}), 400
-
-    logger.info(f"Received audio file: {file.filename}, content type: {file.content_type}")
-    
-    # Determine format based on file extension or content type
-    audio_format = None
-    if file.filename.endswith('.webm'):
-        audio_format = 'webm'
-    elif file.filename.endswith('.ogg'):
-        audio_format = 'ogg'
-    elif file.filename.endswith('.wav'):
-        audio_format = 'wav'
-    elif file.filename.endswith('.mp3') or file.filename.endswith('.mp4'):
-        audio_format = 'mp3'
-    elif 'webm' in file.content_type:
-        audio_format = 'webm'
-    elif 'ogg' in file.content_type:
-        audio_format = 'ogg'
-    elif 'wav' in file.content_type:
-        audio_format = 'wav'
-    elif 'mp3' in file.content_type or 'mp4' in file.content_type:
-        audio_format = 'mp3'
-    else:
-        # Default to webm if we can't determine the format
-        audio_format = 'webm'
-        
-    logger.info(f"Detected audio format: {audio_format}")
-    
-    # Define input_file_path and wav_file_path at a higher scope
-    input_file_path = None
-    wav_file_path = None
-    
-    try:
-        # Save the uploaded file to a temporary file with the appropriate extension
-        with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{audio_format}') as tmp_audio_file:
-            file.save(tmp_audio_file.name)
-            input_file_path = tmp_audio_file.name
-        
-        logger.info(f"Audio file saved temporarily to: {input_file_path}")
-
-        # Convert to WAV using pydub (which uses ffmpeg)
-        # Create a temporary WAV file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_wav_file:
-            wav_file_path = tmp_wav_file.name
-        
-        # Convert to WAV
-        try:
-            logger.info(f"Converting {audio_format.upper()} to WAV: {input_file_path} -> {wav_file_path}")
-            audio = AudioSegment.from_file(input_file_path, format=audio_format)
-            audio.export(wav_file_path, format="wav")
-            logger.info(f"Conversion successful")
-        except Exception as e:
-            logger.error(f"Error converting audio: {e}", exc_info=True)
-            # Clean up temp files created so far before returning
-            if input_file_path and os.path.exists(input_file_path):
-                os.remove(input_file_path)
-            if wav_file_path and os.path.exists(wav_file_path):
-                os.remove(wav_file_path)
-            return jsonify({"error": f"Failed to convert audio: {str(e)}"}), 500
-
-        # Recognize speech using Google Web API
-        try:
-            logger.info("Starting transcription with Google Web API")
-            with sr.AudioFile(wav_file_path) as source:
-                audio_data = recognizer.record(source)
-                transcript_text = recognizer.recognize_google(audio_data, language=os.environ.get('SIMULCHAT_SPEECH_LANG', 'ko-KR'))
-                logger.info(f"Google transcription successful. Transcript: {transcript_text}")
-                return jsonify({"transcript": transcript_text}), 200
-        except sr.UnknownValueError:
-            logger.warning("Google could not understand audio")
-            return jsonify({"error": "Could not understand audio"}), 400
-        except sr.RequestError as e:
-            logger.error(f"Could not request results from Google Speech Recognition service: {e}", exc_info=True)
-            return jsonify({"error": f"Speech recognition service error: {str(e)}"}), 500
-    except Exception as e:
-        logger.error(f"An unexpected error occurred in transcribe_audio: {e}", exc_info=True)
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 if __name__ == '__main__':
