@@ -124,6 +124,30 @@ ANALYSIS_CACHE_TIMEOUT = 8  # seconds
 visual_context_queue = Queue(maxsize=10)  # Limit queue size to prevent memory issues
 is_processing_queue = False
 
+# [SimulChat 한국어]
+KOREAN_RULES = """
+[가장 중요 — 언어]
+위 설명은 영어지만 채팅은 무조건 한국어로 써. 한국 트위치·유튜브 라이브 채팅 말투로.
+- 반말, 대부분 1~15자로 짧게. 마침표 안 찍음. 번역투·존댓말 쓰지 말 것.
+- 영어 이모트(KEKW, POG, LULW, catJAM, monkaS 등) 대신 한국식으로: ㅋㅋㅋㅋ, ㄷㄷ, ㅠㅠ, ㄹㅇ, ㅇㅈ, 헐, 와, 미쳤다
+- 예시: ㅋㅋㅋㅋㅋ / 와 미쳤다 / ㄹㅇ / 이거 뭐임 / 개웃기네 / 헐 / ㅇㅈ / 방금 봤음? / 노래 좋다 / 오 잘하네 / ㄴㄴ 아님 / 몇 시에 끝남? / 배고프다
+- 영어 단어·영어 문장은 쓰지 말 것 (게임·사람 이름 같은 고유명사만 빼고).
+- 네 성격(위 설명)은 그대로 살리되 한국 사람이 치는 채팅처럼."""
+KO_FALLBACK = ["ㅋㅋㅋㅋ", "ㄷㄷ", "ㄹㅇ", "와", "헐", "ㅇㅈ", "ㅋㅋㅋ 뭐임", "오", "미쳤다", "ㅠㅠ"]
+EN_EMOTE_KO = {"kekw": "ㅋㅋㅋㅋ", "lulw": "ㅋㅋㅋㅋㅋ", "lul": "ㅋㅋ", "lol": "ㅋㅋ", "pog": "ㄷㄷ", "poggers": "ㄷㄷㄷ",
+               "pogchamp": "와 ㄷㄷ", "monkas": "ㄷㄷ;;", "catjam": "노래 좋다", "based": "ㄹㅇ", "cringe": "좀 그렇네",
+               "yikes": "헐", "nice": "오 굿", "true": "ㄹㅇ", "facts": "ㅇㅈ", "bruh": "아니 ㅋㅋ", "gg": "ㅈㅈ"}
+_HANGUL = re.compile(r"[가-힣ㄱ-ㅎㅏ-ㅣ]")
+
+
+def to_korean_chat(msg):
+    """한글이 하나도 없는 답(영어 이모트 등)은 한국식으로 바꿈"""
+    if msg and _HANGUL.search(msg):
+        return msg
+    key = re.sub(r"[^a-z]", "", (msg or "").lower())
+    return EN_EMOTE_KO.get(key) or KO_FALLBACK[hash(msg or "") % len(KO_FALLBACK)]
+
+
 def filter_authentic_twitch_response(response):
     """OPTIMIZED Filter - Fast performance for high-volume chat"""
     if not response:
@@ -512,7 +536,7 @@ def get_ai_response():
 
         system_prompt = data.get('system_prompt', '')
         transcribed_input = data.get('transcribed_input', '')
-        model_name = data.get('model_name', DEFAULT_OLLAMA_MODEL)
+        model_name = os.environ.get('SIMULCHAT_CHAT_MODEL') or data.get('model_name', DEFAULT_OLLAMA_MODEL)
         visual_context_memory = data.get('visual_context_memory', {})
         agent_name = data.get('agent_name', 'Unknown')
         recent_messages = data.get('recent_messages', [])
@@ -715,6 +739,7 @@ def get_ai_response():
 
         # --- Final Prompt Assembly ---
         # Combine all parts into a single prompt string
+        prompt_parts.append(KOREAN_RULES)
         final_prompt = "\n\n".join(prompt_parts)
         
         # --- Ollama Payload (NO IMAGES - using pre-computed analysis) ---
@@ -754,7 +779,7 @@ def get_ai_response():
         ai_message = response_data.get("message", {}).get("content", "").strip()
         
         # Post-process to ensure authentic Twitch chat format
-        ai_message = filter_authentic_twitch_response(ai_message)
+        ai_message = to_korean_chat(filter_authentic_twitch_response(ai_message))
 
         logger.info(f"Received from {model_name}: {ai_message}")
         return jsonify({"ai_message": ai_message})
@@ -851,7 +876,7 @@ def transcribe_audio():
             logger.info("Starting transcription with Google Web API")
             with sr.AudioFile(wav_file_path) as source:
                 audio_data = recognizer.record(source)
-                transcript_text = recognizer.recognize_google(audio_data)
+                transcript_text = recognizer.recognize_google(audio_data, language=os.environ.get('SIMULCHAT_SPEECH_LANG', 'ko-KR'))
                 logger.info(f"Google transcription successful. Transcript: {transcript_text}")
                 return jsonify({"transcript": transcript_text}), 200
         except sr.UnknownValueError:
