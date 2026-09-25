@@ -66,19 +66,24 @@ const ChatMessage = ({ message }) => {
     });
   };
 
+  // 유튜브 라이브 채팅처럼: 동그란 프로필(이니셜) + 회색 닉네임 + 흰 글자
+  const avatarColors = ['#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#1e88e5', '#039be5', '#00897b', '#5d4037',
+    '#8e24aa', '#f4511e', '#6d4c41', '#546e7a', '#c2185b', '#5e35b1', '#00838f', '#ef6c00'];
+  const name = user || '';
+  const hash = Array.from(name).reduce((acc, ch, i) => acc + ch.charCodeAt(0) * (i + 7), 0);
+  const avatarColor = avatarColors[hash % avatarColors.length];
+  const initial = (name.replace(/^@/, '')[0] || '?').toUpperCase();
+
   return (
-    <div className={`mb-1 px-2 py-1 rounded ${isFirstTimeChat ? 'bg-[#1f1f23] border-l-4 border-teal-500' : 'hover:bg-[#1f1f23]'} transition-colors duration-150`}>
-      <div className="flex items-start">
-        <div className="flex items-center mr-1">
-          <span style={{ color: userColor }} className="font-bold">{user}</span>
-          <span className="mx-1 text-gray-400">:</span>
-        </div>
-        <div className="flex-1 break-words">
-          {isReply && replyTo && (
-            <span className="text-gray-400 mr-1 text-xs bg-[#2f2f35] px-1 rounded">@{replyTo}</span>
-          )}
-          <span className="text-gray-100">{parseMessage(text)}</span>
-        </div>
+    <div className="yt-line flex items-start px-6 py-1 hover:bg-white/5">
+      <div className="yt-avatar flex-shrink-0 mr-4 mt-0.5 flex items-center justify-center rounded-full text-white font-medium"
+           style={{ backgroundColor: avatarColor }}>
+        {initial}
+      </div>
+      <div className="flex-1 min-w-0 break-words leading-6">
+        <span className={`yt-author mr-2 ${isFirstTimeChat ? 'text-[#2ba640]' : 'text-[#aaaaaa]'}`}>{name}</span>
+        {isReply && replyTo && <span className="yt-message text-[#3ea6ff] mr-1">@{replyTo}</span>}
+        <span className="yt-message text-[#f1f1f1]">{parseMessage(text)}</span>
       </div>
     </div>
   );

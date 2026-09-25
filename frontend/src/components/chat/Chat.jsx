@@ -2196,16 +2196,16 @@ const Chat = () => {
     }
     
     .custom-scrollbar::-webkit-scrollbar-track {
-      background: #0e0e10;
+      background: #0f0f0f;
     }
     
     .custom-scrollbar::-webkit-scrollbar-thumb {
-      background-color: #2c3e50;
+      background-color: #717171;
       border-radius: 4px;
     }
     
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background-color: #3498db;
+      background-color: #aaaaaa;
     }
 
     @keyframes fadeIn {
@@ -2389,65 +2389,63 @@ const Chat = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#0e0e10] text-white">
+    <div className="yt-chat flex flex-col h-screen bg-[#0f0f0f] text-[#f1f1f1]">
       {/* Add style tag for scrollbar styling */}
       <style>{scrollbarStyles}</style>
       
       {/* Removed the test message */}
       
-      <header className="p-3 border-b border-gray-800 flex justify-between items-center bg-gradient-to-r from-[#121214] to-[#18181b] shadow-md">
-        <div className="flex items-center">
-          <h1 className="text-xl font-bold tracking-tight">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-blue-500">SimulChat</span>
-            <span className="ml-2 text-xs text-gray-400 font-normal">BETA</span>
-            <span className="ml-1 text-xs text-gray-500 font-mono">v2.0.0</span>
-          </h1>
-          {cameraError && <span className="ml-4 text-xs text-red-400 bg-red-900/50 p-1 rounded">Camera: {cameraError}</span>}
-          {screenShareError && <span className="ml-2 text-xs text-red-400 bg-red-900/50 p-1 rounded">Screen: {screenShareError}</span>}
+      <header className="h-12 px-4 border-b border-[#303030] flex justify-between items-center bg-[#0f0f0f]">
+        <div className="flex items-center min-w-0">
+          <h1 className="text-base font-normal whitespace-nowrap">실시간 채팅 <span className="text-xs text-[#aaaaaa]">▾</span></h1>
+          {cameraError && <span className="ml-3 text-xs text-red-400 truncate">카메라: {cameraError}</span>}
+          {screenShareError && <span className="ml-2 text-xs text-red-400 truncate">화면: {screenShareError}</span>}
         </div>
         
-        <div className="flex items-center space-x-3">
-          {backendError && <span className="text-xs text-red-400 bg-red-900/50 p-1 rounded whitespace-nowrap overflow-hidden text-ellipsis max-w-xs md:max-w-sm lg:max-w-md">{backendError}</span>}
+        <div className="flex items-center space-x-3 min-w-0">
+          {backendError && <span className="text-xs text-red-400 truncate max-w-xs">{backendError}</span>}
           
           {/* Visual context status badge - UPDATED for better styling and stability */}
           {visualContextStatus && (
-            <span className="min-w-[220px] text-xs text-white bg-gradient-to-r from-teal-600 to-blue-600 p-1 px-3 rounded-full flex items-center justify-center shadow-sm transition-all duration-300">
+            <span className="text-xs text-[#aaaaaa] flex items-center whitespace-nowrap">
               <span className="flex items-center flex-shrink-0">
                 {isCameraActive && <VideoCameraIcon className="h-3 w-3" />}
                 {isScreenSharingActive && <ComputerDesktopIcon className={`h-3 w-3 ${isCameraActive ? 'ml-1.5' : ''}`} />}
                 {!isCameraActive && !isScreenSharingActive && <CameraIcon className="h-3 w-3" />}
               </span>
               <span className="ml-2 whitespace-nowrap overflow-hidden text-ellipsis">
-                {isCameraActive && isScreenSharingActive ? 'Both Feeds Active' : visualContextStatus}
+                {isCameraActive && isScreenSharingActive ? '카메라·화면 보는 중' : visualContextStatus}
               </span>
             </span>
           )}
 
           {/* NEW: Music Playing Status */}
           {isMusicPlaying && (
-            <span className="text-xs text-white bg-gradient-to-r from-purple-500 to-pink-500 p-1 px-2 rounded-full flex items-center shadow-sm animate-pulse">
+            <span className="text-xs text-[#aaaaaa] flex items-center animate-pulse whitespace-nowrap">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V3z" />
               </svg>
-              <span>Dance Mode!</span>
+              <span>음악 나오는 중</span>
             </span>
           )}
+          <span className="text-xs text-[#aaaaaa] whitespace-nowrap">{viewerCount.toLocaleString()}명 시청 중</span>
+          <button type="button" className="text-[#f1f1f1] text-lg leading-none px-1" title="메뉴" onClick={handleViewersClick}>⋮</button>
         </div>
       </header>
 
       {/* Viewers Modal */}
       {showViewersModal && (
-        <div className="fixed top-16 right-4 bg-[#1f1f23] border border-gray-800 rounded-md shadow-lg p-3 z-50 animate-fade-in">
-          <div className="flex items-center">
-            <UserGroupIcon className="h-5 w-5 text-teal-400 mr-2" />
-            <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-blue-500">{viewerCount}</span>
-            <span className="ml-2 text-gray-300">viewers</span>
+        <div className="fixed top-12 right-4 bg-[#282828] rounded-lg shadow-lg p-3 z-50 animate-fade-in">
+          <div className="flex items-center text-sm">
+            <UserGroupIcon className="h-5 w-5 text-[#aaaaaa] mr-2" />
+            <span>{viewerCount.toLocaleString()}</span>
+            <span className="ml-1 text-[#aaaaaa]">명 시청 중</span>
           </div>
         </div>
       )}
 
       {/* Combined Video Display Area */}
-      <div className="w-full p-2 flex flex-row flex-wrap justify-center gap-2 bg-[#18181b] border-b border-gray-800">
+      <div className={`w-full flex flex-row flex-wrap justify-center gap-2 bg-[#0f0f0f] ${isCameraActive || isScreenSharingActive ? 'p-2 border-b border-[#303030]' : ''}`}>
         {/* Camera Video Display */}
         {isCameraActive && (
           <div 
@@ -2468,7 +2466,7 @@ const Chat = () => {
           >
             {/* Video will be appended here by ref */}
             <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-xs text-white px-2 py-1 rounded-full">
-              Live Camera
+              카메라
             </div>
           </div>
         )}
@@ -2493,7 +2491,7 @@ const Chat = () => {
             }}
           >
             <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-xs text-white px-2 py-1 rounded-full">
-              Screen Share
+              화면 공유
             </div>
           </div>
         )}
@@ -2504,12 +2502,12 @@ const Chat = () => {
       </div>
 
       {/* Chat Messages */}
-      <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-1 bg-[#0e0e10] custom-scrollbar">
+      <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto py-2 bg-[#0f0f0f] custom-scrollbar">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <ChatBubbleBottomCenterTextIcon className="h-12 w-12 mb-2" />
-            <p className="text-lg">Chat is empty. Say something to get started!</p>
-            <p className="text-sm mt-2">Try using the camera for AI to react to what they see.</p>
+          <div className="flex flex-col items-center justify-center h-full text-[#aaaaaa]">
+            <ChatBubbleBottomCenterTextIcon className="h-10 w-10 mb-2" />
+            <p className="text-sm">실시간 채팅에 오신 것을 환영합니다!</p>
+            <p className="text-xs mt-1">채팅을 치거나 카메라·화면 공유를 켜면 시청자들이 반응해요.</p>
           </div>
         ) : (
           messages.map((msg) => (
@@ -2520,7 +2518,7 @@ const Chat = () => {
       </div>
 
       {/* Message Input */}
-      <form onSubmit={handleSendMessage} className="p-3 border-t border-gray-800 bg-[#0e0e10]">
+      <form onSubmit={handleSendMessage} className="px-6 pt-3 pb-2 border-t border-[#303030] bg-[#0f0f0f]">
         {/* Hidden file input, controlled by the button in the toolbar below */}
         <input
             type="file"
@@ -2528,80 +2526,69 @@ const Chat = () => {
             onChange={handleFileChange}
             className="hidden"
             accept="image/*"
-            id="imageUploadInput" // Added an ID for clarity, though not strictly necessary for ref
+            id="imageUploadInput"
         />
 
-        <div className="flex items-center bg-[#1f1f23] rounded-md p-2 border border-gray-700">
-          <button type="button" className="p-2 text-gray-400 hover:text-teal-400">
-            <ChatBubbleBottomCenterTextIcon className="h-5 w-5" />
-          </button>
-          <div className="flex-1 relative mx-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={isRecording 
-                ? (isSpeaking 
-                  ? "Listening... (Speech detected)" 
-                  : hasSpeechOccurredRef.current 
-                    ? "Silence detected - will auto-stop soon" 
-                    : "Waiting for speech...")
-                : "Send a message or click mic"}
-              className={`w-full bg-transparent outline-none focus:outline-none px-1 py-1 placeholder-gray-500 border-b-2 border-gray-600 focus:border-teal-500 transition-colors duration-300 ${
-                isRecording 
-                  ? (isSpeaking 
-                    ? 'text-teal-400' 
-                    : hasSpeechOccurredRef.current 
-                      ? 'text-yellow-400' 
-                      : 'text-blue-400')
-                  : ''
-              }`}
-              disabled={isRecording}
-            />
-            {/* Auto-stop progress indicator */}
-            {isRecording && !isSpeaking && hasSpeechOccurredRef.current && (
-              <div className="absolute bottom-0 left-0 h-0.5 bg-yellow-500 animate-pulse" style={{ width: '100%' }}></div>
-            )}
-          </div>
-          <button 
-            type="button" 
-            onClick={toggleRecording} 
-            className={`p-2 ${
-              isRecording 
-                ? (isSpeaking 
-                  ? 'text-teal-500 animate-pulse' 
-                  : hasSpeechOccurredRef.current 
-                    ? 'text-yellow-500 animate-pulse' 
-                    : 'text-blue-500 animate-pulse')
-                : 'text-gray-400'
-            } hover:text-teal-400 transition-colors`}
-            title={isRecording ? "Stop recording" : "Start voice input"}
-          >
-            {isRecording ? (
-              isSpeaking ? <MicrophoneIcon className="h-5 w-5" /> : <StopCircleIcon className="h-5 w-5" />
-            ) : (
-              <MicrophoneIcon className="h-5 w-5" />
-            )}
-          </button>
-           <button type="submit" className="p-2 text-teal-500 hover:text-teal-400" disabled={isRecording} title="Send message">
-            <PaperAirplaneIcon className="h-5 w-5" />
-          </button>
+        {/* 유튜브 입력창: 프로필 + 이름, 밑줄 입력칸, 글자 수, 보내기 */}
+        <div className="flex items-center mb-1">
+          <div className="yt-avatar flex-shrink-0 mr-4 flex items-center justify-center rounded-full text-white font-medium bg-[#e91e63]">나</div>
+          <span className="yt-author text-[#aaaaaa]">시청자</span>
         </div>
-        <div className="flex justify-between items-center mt-2">
+        <div className="ml-10 relative">
+          <input
+            type="text"
+            value={input}
+            maxLength={200}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={isRecording
+              ? (isSpeaking
+                ? "듣는 중... (말소리 감지)"
+                : hasSpeechOccurredRef.current
+                  ? "조용해서 곧 멈춰요"
+                  : "말해 주세요...")
+              : "채팅..."}
+            className={`w-full bg-transparent outline-none focus:outline-none py-1 text-sm placeholder-[#717171] border-b border-[#717171] focus:border-[#3ea6ff] transition-colors duration-200 ${
+              isRecording ? (isSpeaking ? 'text-[#3ea6ff]' : 'text-yellow-400') : ''
+            }`}
+            disabled={isRecording}
+          />
+          {isRecording && !isSpeaking && hasSpeechOccurredRef.current && (
+            <div className="absolute bottom-0 left-0 h-0.5 bg-yellow-500 animate-pulse" style={{ width: '100%' }}></div>
+          )}
+        </div>
+        <div className="ml-8 mt-1 flex items-center justify-between">
+          <div className="flex items-center space-x-3 text-[#aaaaaa]">
+            <button
+              type="button"
+              onClick={toggleRecording}
+              className={`${isRecording ? 'text-[#3ea6ff] animate-pulse' : ''} hover:text-white transition-colors`}
+              title={isRecording ? "녹음 멈추기" : "말로 채팅하기"}
+            >
+              {isRecording && !isSpeaking ? <StopCircleIcon className="h-5 w-5" /> : <MicrophoneIcon className="h-5 w-5" />}
+            </button>
+          </div>
+          <div className="flex items-center space-x-3">
+            <span className="text-xs text-[#717171]">{input.length}/200</span>
+            <button type="submit" className={`${input.trim() ? 'text-[#3ea6ff]' : 'text-[#717171]'} hover:text-white`} disabled={isRecording} title="보내기">
+              <PaperAirplaneIcon className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+        <div className="flex justify-between items-center mt-2 pt-2 border-t border-[#303030]">
             <div className="flex space-x-3">
                 <button 
                   type="button" 
                   onClick={() => fileInputRef.current && fileInputRef.current.click()} 
-                  className="text-gray-400 hover:text-teal-400 transition-colors" 
-                  title="Upload Image for AI"
+                  className="text-[#aaaaaa] hover:text-white transition-colors" 
+                  title="사진 보여 주기"
                 >
                   <CameraIcon className="h-5 w-5"/>
                 </button>
                 
                 <button 
                   onClick={handleToggleCamera}
-                  className={`flex items-center ${isCameraActive ? 'text-teal-500' : 'text-gray-400'} hover:text-teal-400 transition-colors`}
-                  title={isCameraActive ? "Stop Camera" : "Start Camera"}
+                  className={`flex items-center ${isCameraActive ? 'text-[#3ea6ff]' : 'text-[#aaaaaa]'} hover:text-white transition-colors`}
+                  title={isCameraActive ? "카메라 끄기" : "카메라 켜기"}
                 >
                   {isCameraActive ? 
                     <VideoCameraSlashIcon className="h-5 w-5" /> : 
@@ -2611,8 +2598,8 @@ const Chat = () => {
                 
                 <button 
                   onClick={handleToggleScreenShare}
-                  className={`flex items-center ${isScreenSharingActive ? 'text-teal-500' : 'text-gray-400'} hover:text-teal-400 transition-colors`}
-                  title={isScreenSharingActive ? "Stop Screen Share" : "Start Screen Share"}
+                  className={`flex items-center ${isScreenSharingActive ? 'text-[#3ea6ff]' : 'text-[#aaaaaa]'} hover:text-white transition-colors`}
+                  title={isScreenSharingActive ? "화면 공유 끄기" : "화면 공유 켜기"}
                 >
                   {isScreenSharingActive ? 
                     <ComputerDesktopIcon className="h-5 w-5 mr-1 opacity-50" /> : 
@@ -2620,11 +2607,11 @@ const Chat = () => {
                   }
                 </button>
                 
-                <button className="text-gray-400 hover:text-teal-400 transition-colors" title="Viewers" onClick={handleViewersClick}>
+                <button type="button" className="text-[#aaaaaa] hover:text-white transition-colors" title="시청자 수" onClick={handleViewersClick}>
                   <UserGroupIcon className="h-5 w-5"/>
                 </button>
                 
-                <button className="text-gray-400 hover:text-teal-400 transition-colors" title="Settings">
+                <button type="button" className="text-[#aaaaaa] hover:text-white transition-colors" title="설정">
                   <Cog8ToothIcon className="h-5 w-5"/>
                 </button>
             </div>
