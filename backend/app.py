@@ -431,6 +431,17 @@ def trigger_async_visual_analysis(image_base64, context_type):
             'image_base64': image_base64,
             'context_type': context_type
         }
+        # 분석이 5초보다 느리면 밀린 사진은 버리고 가장 최근 사진만 분석 (늦은 상황에 반응하지 않게)
+        kept = []
+        while True:
+            try:
+                old = analysis_queue.get_nowait()
+            except queue.Empty:
+                break
+            if old and old.get('context_type') != context_type:
+                kept.append(old)
+        for old in kept:
+            analysis_queue.put_nowait(old)
         analysis_queue.put_nowait(analysis_request)
         logger.info(f"Queued visual analysis for {context_type}")
     except queue.Full:

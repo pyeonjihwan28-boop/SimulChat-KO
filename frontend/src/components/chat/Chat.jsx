@@ -787,6 +787,7 @@ const Chat = () => {
   
   // Minimum time between updates for the same context type (in milliseconds)
   const MIN_UPDATE_INTERVAL = 3000; // 3 seconds
+  const CAPTURE_INTERVAL_MS = 5000; // 카메라·화면 사진을 찍어 AI에게 보여 주는 간격
 
   const [isReplyingToUser, setIsReplyingToUser] = useState(false);
 
@@ -2036,7 +2037,7 @@ const Chat = () => {
         if (captureIntervalRef.current) {
           clearInterval(captureIntervalRef.current);
         }
-        captureIntervalRef.current = setInterval(captureAndSendFrame, 30000); // Every 30 seconds for better performance 
+        captureIntervalRef.current = setInterval(captureAndSendFrame, CAPTURE_INTERVAL_MS); // 5초마다 (상황을 빨리 알아채게)
         
         return () => {
           clearTimeout(initialCaptureTimeout);
@@ -2173,7 +2174,7 @@ const Chat = () => {
 
         // PERFORMANCE OPTIMIZATION: Reduced frequency and quality for faster processing
         // Set up interval to capture frames every 30 seconds (reduced from 4s)
-        screenCaptureIntervalRef.current = setInterval(captureAndSendScreenFrame, 30000);
+        screenCaptureIntervalRef.current = setInterval(captureAndSendScreenFrame, CAPTURE_INTERVAL_MS);
 
         stream.getVideoTracks()[0].onended = () => {
           console.log("Screen sharing ended by user or browser.");
