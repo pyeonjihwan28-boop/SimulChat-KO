@@ -2450,7 +2450,6 @@ const Chat = () => {
       <header className="h-12 px-4 border-b border-[#303030] flex justify-between items-center bg-[#0f0f0f]">
         <div className="flex items-center min-w-0">
           <h1 className="text-base font-normal whitespace-nowrap">실시간 채팅 <span className="text-xs text-[#aaaaaa]">▾</span></h1>
-          {cameraError && <span className="ml-3 text-xs text-red-400 truncate">카메라: {cameraError}</span>}
           {screenShareError && <span className="ml-2 text-xs text-red-400 truncate">화면: {screenShareError}</span>}
         </div>
         
@@ -2498,31 +2497,6 @@ const Chat = () => {
 
       {/* Combined Video Display Area */}
       <div className={`w-full flex flex-row flex-wrap justify-center gap-2 bg-[#0f0f0f] ${isCameraActive || isScreenSharingActive ? 'p-2 border-b border-[#303030]' : ''}`}>
-        {/* Camera Video Display */}
-        {isCameraActive && (
-          <div 
-            className="relative video-container flex-1 min-w-[300px]" 
-            id="video-container"
-            ref={el => {
-              if (el && videoRef.current && !el.contains(videoRef.current)) {
-                console.log("Attaching camera video element to DOM");
-                // Clear existing content first
-                el.innerHTML = '';
-                // Ensure video has correct styling
-                videoRef.current.className = "rounded-md border border-gray-800 max-h-64 w-full shadow-lg";
-                videoRef.current.style.backgroundColor = "#0e0e10";
-                // Append to container
-                el.appendChild(videoRef.current);
-              }
-            }}
-          >
-            {/* Video will be appended here by ref */}
-            <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-xs text-white px-2 py-1 rounded-full">
-              카메라
-            </div>
-          </div>
-        )}
-
         {/* Screen Share Video Display */}
         {isScreenSharingActive && (
           <div 
@@ -2644,16 +2618,7 @@ const Chat = () => {
                   <CameraIcon className="h-5 w-5"/>
                 </button>
                 
-                <button 
-                  onClick={handleToggleCamera}
-                  className={`flex items-center ${isCameraActive ? 'text-[#3ea6ff]' : 'text-[#aaaaaa]'} hover:text-white transition-colors`}
-                  title={isCameraActive ? "카메라 끄기" : "카메라 켜기"}
-                >
-                  {isCameraActive ? 
-                    <VideoCameraSlashIcon className="h-5 w-5" /> : 
-                    <VideoCameraIcon className="h-5 w-5" />
-                  }
-                </button>
+                {/* 카메라 기능은 뺌 */}
                 
                 <button 
                   onClick={handleToggleScreenShare}
